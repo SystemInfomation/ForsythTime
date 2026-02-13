@@ -182,17 +182,17 @@ export function Broadcaster() {
           <CardContent className="p-6 sm:p-8 flex flex-col items-center justify-center min-h-[200px]">
             <Camera className="h-12 w-12 text-muted-foreground mb-4" />
             <p className="text-sm text-muted-foreground mb-4 text-center">
-              Start your camera to begin broadcasting
+              Start a call to share your camera
             </p>
             <Button onClick={handleStartCamera} className="gap-2" size="lg">
               <Video className="h-4 w-4" />
-              Start Camera
+              Start Call
             </Button>
           </CardContent>
         </Card>
       ) : (
         <Card className="glass border-white/10 overflow-hidden accent-border">
-          <CardContent className="p-0 relative video-stage">
+          <CardContent className="p-0 relative video-stage call-shell">
             <div
               className="relative"
               onMouseEnter={() => setShowControls(true)}
@@ -203,6 +203,17 @@ export function Broadcaster() {
               }}
               onMouseMove={resetIdle}
             >
+              <div className="call-header">
+                <div>
+                  <p className="call-title">You</p>
+                  <p className="call-subtitle">
+                    {status === "connected" ? "On call" : "Ready to call"}
+                  </p>
+                </div>
+                <span className="call-badge">
+                  {status === "connected" ? "Live" : "Preview"}
+                </span>
+              </div>
               <video
                 ref={videoRef}
                 autoPlay
@@ -219,7 +230,7 @@ export function Broadcaster() {
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
-                    className={`absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/60 to-transparent ${isIdle ? "controls-idle" : ""}`}
+                    className={`call-controls ${isIdle ? "controls-idle" : ""}`}
                   >
                     <div className="flex items-center justify-center gap-2">
                       <Button
@@ -229,7 +240,7 @@ export function Broadcaster() {
                           triggerHaptic(8);
                           toggleMute();
                         }}
-                        className="h-10 w-10 rounded-full bg-white/10 hover:bg-white/20"
+                        className="call-control-btn"
                         aria-label={isMuted ? "Unmute" : "Mute"}
                       >
                         {isMuted ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
@@ -238,7 +249,7 @@ export function Broadcaster() {
                         variant="ghost"
                         size="icon"
                         onClick={switchCamera}
-                        className="h-10 w-10 rounded-full bg-white/10 hover:bg-white/20"
+                        className="call-control-btn"
                         aria-label="Switch camera"
                       >
                         <SwitchCamera className="h-4 w-4" />
@@ -250,7 +261,7 @@ export function Broadcaster() {
                           triggerHaptic(6);
                           handleFullscreen();
                         }}
-                        className="h-10 w-10 rounded-full bg-white/10 hover:bg-white/20"
+                        className="call-control-btn"
                         aria-label="Fullscreen"
                       >
                         <Maximize className="h-4 w-4" />
@@ -260,7 +271,7 @@ export function Broadcaster() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-10 w-10 rounded-full bg-red-500/20 hover:bg-red-500/30 text-red-400"
+                            className="call-control-btn call-control-btn-danger"
                             aria-label="Disconnect"
                           >
                             <Power className="h-4 w-4" />

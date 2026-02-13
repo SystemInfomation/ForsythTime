@@ -145,7 +145,7 @@ export function Viewer() {
         <Card className="glass border-white/10 accent-border">
           <CardContent className="p-4 sm:p-6 space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="peer-id-input">Broadcaster Peer ID</Label>
+              <Label htmlFor="peer-id-input">Call ID</Label>
               <motion.div
                 animate={shakeInput ? { x: [-10, 10, -10, 10, 0] } : {}}
                 transition={{ duration: 0.4 }}
@@ -153,13 +153,13 @@ export function Viewer() {
                 <Input
                   ref={inputRef}
                   id="peer-id-input"
-                  placeholder="Enter Peer ID from broadcaster"
+                  placeholder="Enter Call ID from your friend"
                   value={remotePeerId}
                   onChange={(e) => setRemotePeerId(e.target.value)}
                   onPaste={handlePaste}
                   onKeyDown={(e) => e.key === "Enter" && handleConnect()}
                   className="font-mono text-center text-lg h-12 bg-white/5"
-                  aria-label="Enter broadcaster Peer ID"
+                  aria-label="Enter call ID"
                   autoComplete="off"
                 />
               </motion.div>
@@ -179,7 +179,7 @@ export function Viewer() {
               ) : (
                 <>
                   <Play className="h-4 w-4" />
-                  Connect
+                  Join Call
                 </>
               )}
             </Button>
@@ -217,7 +217,7 @@ export function Viewer() {
             transition={{ duration: 0.4 }}
           >
             <Card className="glass border-white/10 overflow-hidden accent-border">
-              <CardContent className="p-0 relative video-stage">
+              <CardContent className="p-0 relative video-stage call-shell">
                 <div
                   className="relative"
                   onMouseEnter={() => setShowControls(true)}
@@ -228,6 +228,15 @@ export function Viewer() {
                   }}
                   onMouseMove={resetIdle}
                 >
+                  <div className="call-header">
+                    <div>
+                      <p className="call-title">Chromebook Call</p>
+                      <p className="call-subtitle">
+                        {remotePeerId ? `Call ID ${remotePeerId.slice(0, 4)}…${remotePeerId.slice(-4)}` : "Connecting"}
+                      </p>
+                    </div>
+                    <span className="call-badge">Live</span>
+                  </div>
                   <video
                     ref={videoRef}
                     autoPlay
@@ -243,7 +252,7 @@ export function Viewer() {
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
-                        className={`absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/60 to-transparent ${isIdle ? "controls-idle" : ""}`}
+                        className={`call-controls ${isIdle ? "controls-idle" : ""}`}
                       >
                         <div className="flex items-center justify-center gap-2">
                           <Button
@@ -253,7 +262,7 @@ export function Viewer() {
                               triggerHaptic(8);
                               toggleMute();
                             }}
-                            className="h-10 w-10 rounded-full bg-white/10 hover:bg-white/20"
+                            className="call-control-btn"
                             aria-label={isMuted ? "Unmute" : "Mute"}
                           >
                             {isMuted ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
@@ -265,7 +274,7 @@ export function Viewer() {
                               triggerHaptic(6);
                               handleFullscreen();
                             }}
-                            className="h-10 w-10 rounded-full bg-white/10 hover:bg-white/20"
+                            className="call-control-btn"
                             aria-label="Fullscreen"
                           >
                             <Maximize className="h-4 w-4" />
@@ -274,7 +283,7 @@ export function Viewer() {
                             variant="ghost"
                             size="icon"
                             onClick={handleReconnect}
-                            className="h-10 w-10 rounded-full bg-white/10 hover:bg-white/20"
+                            className="call-control-btn"
                             aria-label="Reconnect"
                           >
                             <RefreshCw className="h-4 w-4" />
@@ -286,7 +295,7 @@ export function Viewer() {
                               triggerHaptic([12, 20, 12]);
                               disconnect();
                             }}
-                            className="h-10 w-10 rounded-full bg-red-500/20 hover:bg-red-500/30 text-red-400"
+                            className="call-control-btn call-control-btn-danger"
                             aria-label="Disconnect"
                           >
                             <Power className="h-4 w-4" />

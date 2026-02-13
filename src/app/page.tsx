@@ -54,11 +54,11 @@ export default function Home() {
             <div className="flex items-center justify-center gap-3 mb-2">
               <Radio className="h-8 w-8 text-blue-400 glow-icon" />
               <h1 className="text-3xl sm:text-4xl font-bold glow-text">
-                Forsyth Time
+                Forsyth FaceTime
               </h1>
             </div>
             <p className="text-sm sm:text-base text-muted-foreground text-glass">
-              Real-time chromebook to chromebook streaming
+              FaceTime-style Chromebook video calling
             </p>
           </motion.div>
 
@@ -73,11 +73,11 @@ export default function Home() {
               <TabsList className="mb-4">
                 <TabsTrigger value="broadcaster" className="gap-2">
                   <Smartphone className="h-4 w-4" />
-                  Broadcaster
+                  Start Call
                 </TabsTrigger>
                 <TabsTrigger value="viewer" className="gap-2">
                   <Monitor className="h-4 w-4" />
-                  Viewer
+                  Join Call
                 </TabsTrigger>
               </TabsList>
 
