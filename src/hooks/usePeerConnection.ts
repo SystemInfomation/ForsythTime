@@ -62,7 +62,7 @@ export function usePeerBroadcaster(): UsePeerBroadcasterReturn {
         console.log('[DEBUG] Incoming call from viewer:', call.peer);
         setStatus("connected");
         callRef.current = call;
-        call.answer(stream);
+        call.answer(streamRef.current);
 
         call.on("stream", (remoteStream) => {
         console.log('[DEBUG] Stream established with viewer');
