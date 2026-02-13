@@ -11,10 +11,11 @@ const CORS_ORIGIN = process.env.CORS_ORIGIN || "*";
 // PeerJS server
 const peerServer = ExpressPeerServer(server, {
   debug: true,
-  path: '/',
+  path: '/peerjs',
   cors: {
-    origin: CORS_ORIGIN,
-    methods: ["GET", "POST"],
+    origin: ["https://camera-dashcam.vercel.app", "http://localhost:3000"],
+    methods: ["GET", "POST", "OPTIONS"],
+    credentials: true
   },
 });
 
@@ -27,7 +28,7 @@ const io = new Server(server, {
 });
 
 // Mount PeerJS server
-app.use('/peerjs', peerServer);
+app.use('/', peerServer);
 
 // In-memory room state: roomId -> { broadcaster: socketId, viewer: socketId }
 const rooms = new Map();
