@@ -17,6 +17,11 @@ export const metadata: Metadata = {
   title: "Forsyth Time – Real-time Chromebook to Chromebook Streaming",
   description:
     "Stream your Chromebook camera to any desktop browser in real-time.",
+  icons: {
+    icon: "/tab-logo.png",
+    shortcut: "/tab-logo.png",
+    apple: "/tab-logo.png",
+  },
 };
 
 export default function RootLayout({
