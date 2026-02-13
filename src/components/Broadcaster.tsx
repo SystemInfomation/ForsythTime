@@ -53,14 +53,18 @@ export function Broadcaster() {
   const shouldReduceMotion = useReducedMotion();
 
   useEffect(() => {
-    if (localVideoRef.current && localStream) {
-      localVideoRef.current.srcObject = localStream;
+    const localVideo = localVideoRef.current;
+    if (localVideo && localStream) {
+      localVideo.srcObject = localStream;
+      localVideo.play().catch(() => {});
     }
   }, [localStream]);
 
   useEffect(() => {
-    if (remoteVideoRef.current && remoteStream) {
-      remoteVideoRef.current.srcObject = remoteStream;
+    const remoteVideo = remoteVideoRef.current;
+    if (remoteVideo && remoteStream) {
+      remoteVideo.srcObject = remoteStream;
+      remoteVideo.play().catch(() => {});
     }
   }, [remoteStream]);
 
@@ -226,15 +230,18 @@ export function Broadcaster() {
               {remoteStream ? (
                 <>
                   <video
+                    key="remote"
                     ref={remoteVideoRef}
                     autoPlay
                     playsInline
+                    muted={false}
                     className="w-full aspect-video object-cover rounded-lg video-tile"
                     aria-label="Remote stream"
                   />
                   {localStream && (
                     <div className="pip-shell">
                       <video
+                        key="local-pip"
                         ref={localVideoRef}
                         autoPlay
                         playsInline
@@ -247,6 +254,7 @@ export function Broadcaster() {
                 </>
               ) : (
                 <video
+                  key="local-preview"
                   ref={localVideoRef}
                   autoPlay
                   playsInline
