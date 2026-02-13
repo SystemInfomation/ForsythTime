@@ -1,6 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  basePath: "/time",
+  assetPrefix: "/time/",
   output: "export",
   trailingSlash: true,
   images: {
