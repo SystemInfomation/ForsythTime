@@ -21,7 +21,7 @@ const nextConfig: NextConfig = {
           },
           {
             key: 'Content-Security-Policy',
-            value: "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline'; connect-src 'self' ws://localhost:3001 wss://localhost:3001 http://localhost:3001 https://*.ingest.us.sentry.io; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:;",
+            value: "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline'; connect-src 'self' https://forsythtime.onrender.com wss://forsythtime.onrender.com https://*.ingest.us.sentry.io https://*.onrender.com wss://*.onrender.com https://*.vercel.app wss://*.vercel.app ws://localhost:* http://localhost:*; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:;",
           },
         ],
       },
