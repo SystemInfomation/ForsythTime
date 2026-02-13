@@ -35,6 +35,7 @@ export function usePeerBroadcaster(): UsePeerBroadcasterReturn {
   const callRef = useRef<import("peerjs").MediaConnection | null>(null);
 
   const startCamera = useCallback(async () => {
+    console.log('[DEBUG] Starting camera with facing mode:', facingMode);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode, width: { ideal: 1280 }, height: { ideal: 720 } },
@@ -43,46 +44,57 @@ export function usePeerBroadcaster(): UsePeerBroadcasterReturn {
       streamRef.current = stream;
       setLocalStream(stream);
       setError(null);
+      console.log('[DEBUG] Camera stream obtained');
 
       // Import PeerJS dynamically
       const { default: Peer } = await import("peerjs");
+      console.log('[DEBUG] Creating broadcaster Peer with ID:', peerId);
+      console.log('[DEBUG] Peer config:', PEER_CONFIG);
       const peer = new Peer(peerId, PEER_CONFIG);
       peerRef.current = peer;
 
       peer.on("open", () => {
+        console.log('[DEBUG] Broadcaster Peer opened with ID:', peerId);
         setStatus("waiting");
       });
 
       peer.on("call", (call) => {
+        console.log('[DEBUG] Incoming call from viewer:', call.peer);
         setStatus("connected");
         callRef.current = call;
         call.answer(stream);
 
-        call.on("stream", () => {
-          setStatus("streaming");
-        });
-
-        call.on("close", () => {
-          setStatus("waiting");
-          callRef.current = null;
-        });
-
-        call.on("error", () => {
-          setStatus("error");
-          setError("Call error occurred");
-        });
+        call.on("stream", (remoteStream) => {
+        console.log('[DEBUG] Stream established with viewer');
+        setStatus("streaming");
       });
 
-      peer.on("error", (err) => {
+      call.on("close", () => {
+        console.log('[DEBUG] Call closed by viewer');
+        setStatus("waiting");
+        callRef.current = null;
+      });
+
+      call.on("error", (err) => {
+        console.error('[DEBUG] Call error:', err);
         setStatus("error");
-        setError(err.message || "PeerJS error");
+        setError("Call error occurred");
       });
+    });
 
-      peer.on("disconnected", () => {
-        setStatus("disconnected");
-      });
+    peer.on("error", (err) => {
+      console.error('[DEBUG] Broadcaster Peer error:', err);
+      setStatus("error");
+      setError(err.message || "PeerJS error");
+    });
+
+    peer.on("disconnected", () => {
+      console.log('[DEBUG] Broadcaster Peer disconnected');
+      setStatus("disconnected");
+    });
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to access camera";
+      console.error('[DEBUG] Camera/start error:', err);
       setError(message);
       setStatus("error");
     }
@@ -179,7 +191,9 @@ export function usePeerViewer(): UsePeerViewerReturn {
   const retryCountRef = useRef(0);
 
   const connect = useCallback(async (remotePeerId: string) => {
+    console.log('[DEBUG] Viewer attempting to connect to:', remotePeerId);
     if (!remotePeerId.trim()) {
+      console.log('[DEBUG] Invalid Peer ID provided');
       setError("Please enter a valid Peer ID");
       return;
     }
@@ -189,6 +203,8 @@ export function usePeerViewer(): UsePeerViewerReturn {
 
     try {
       const { default: Peer } = await import("peerjs");
+      console.log('[DEBUG] Creating viewer Peer');
+      console.log('[DEBUG] Peer config:', PEER_CONFIG);
 
       // Cleanup previous connection
       peerRef.current?.destroy();
@@ -197,45 +213,55 @@ export function usePeerViewer(): UsePeerViewerReturn {
       peerRef.current = peer;
 
       peer.on("open", () => {
+        console.log('[DEBUG] Viewer Peer opened, calling broadcaster:', remotePeerId);
         // Create a silent stream to initiate the call (viewer doesn't need to send media)
         const silentStream = new MediaStream();
         const call = peer.call(remotePeerId, silentStream);
         callRef.current = call;
 
         if (!call) {
+          console.log('[DEBUG] Failed to initiate call to broadcaster');
           setStatus("error");
           setError("Failed to initiate call. Check the Peer ID.");
           return;
         }
 
+        console.log('[DEBUG] Call initiated to broadcaster:', remotePeerId);
+
         call.on("stream", (stream) => {
-          setRemoteStream(stream);
-          setStatus("streaming");
-          retryCountRef.current = 0;
-        });
-
-        call.on("close", () => {
-          setStatus("disconnected");
-          setRemoteStream(null);
-        });
-
-        call.on("error", (err) => {
-          setStatus("error");
-          setError(err.message || "Call failed");
-        });
+        console.log('[DEBUG] Received stream from broadcaster');
+        setRemoteStream(stream);
+        setStatus("streaming");
+        retryCountRef.current = 0;
       });
 
-      peer.on("error", (err) => {
-        setStatus("error");
-        setError(err.message || "Connection failed");
-        retryCountRef.current++;
-      });
-
-      peer.on("disconnected", () => {
+      call.on("close", () => {
+        console.log('[DEBUG] Call closed by broadcaster');
         setStatus("disconnected");
+        setRemoteStream(null);
       });
+
+      call.on("error", (err) => {
+        console.error('[DEBUG] Viewer call error:', err);
+        setStatus("error");
+        setError(err.message || "Call failed");
+      });
+    });
+
+    peer.on("error", (err) => {
+      console.error('[DEBUG] Viewer Peer error:', err);
+      setStatus("error");
+      setError(err.message || "Connection failed");
+      retryCountRef.current++;
+    });
+
+    peer.on("disconnected", () => {
+      console.log('[DEBUG] Viewer Peer disconnected');
+      setStatus("disconnected");
+    });
     } catch (err) {
       const message = err instanceof Error ? err.message : "Connection failed";
+      console.error('[DEBUG] Viewer connection error:', err);
       setError(message);
       setStatus("error");
       retryCountRef.current++;

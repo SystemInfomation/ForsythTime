@@ -9,7 +9,7 @@ export const PEER_CONFIG = {
   port: 443,
   path: '/peerjs',
   secure: true,
-  debug: (typeof window !== 'undefined' && window.location.hostname === 'localhost') ? 2 : 0,
+  debug: 2, // Enable all debug logs
 } as const;
 
 export function validatePeerId(id: string): boolean {
