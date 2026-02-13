@@ -181,6 +181,7 @@ interface UsePeerViewerReturn {
 }
 
 export function usePeerViewer(): UsePeerViewerReturn {
+  const [viewerId] = useState(() => generatePeerId());
   const [status, setStatus] = useState<ConnectionState>("idle");
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -209,7 +210,7 @@ export function usePeerViewer(): UsePeerViewerReturn {
       // Cleanup previous connection
       peerRef.current?.destroy();
 
-      const peer = new Peer(undefined, PEER_CONFIG);
+      const peer = new Peer(viewerId, PEER_CONFIG);
       peerRef.current = peer;
 
       peer.on("open", () => {
