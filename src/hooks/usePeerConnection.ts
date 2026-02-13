@@ -209,7 +209,7 @@ export function usePeerViewer(): UsePeerViewerReturn {
       // Cleanup previous connection
       peerRef.current?.destroy();
 
-      const peer = new Peer(PEER_CONFIG);
+      const peer = new Peer(undefined, PEER_CONFIG);
       peerRef.current = peer;
 
       peer.on("open", () => {
