@@ -33,6 +33,7 @@ export function Broadcaster() {
     peerId,
     status,
     localStream,
+    remoteStream,
     error,
     isMuted,
     startCamera,
@@ -41,7 +42,8 @@ export function Broadcaster() {
     disconnect,
   } = usePeerBroadcaster();
 
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const localVideoRef = useRef<HTMLVideoElement>(null);
+  const remoteVideoRef = useRef<HTMLVideoElement>(null);
   const [copied, setCopied] = useState(false);
   const [showControls, setShowControls] = useState(true);
   const [cameraStarted, setCameraStarted] = useState(false);
@@ -51,10 +53,16 @@ export function Broadcaster() {
   const shouldReduceMotion = useReducedMotion();
 
   useEffect(() => {
-    if (videoRef.current && localStream) {
-      videoRef.current.srcObject = localStream;
+    if (localVideoRef.current && localStream) {
+      localVideoRef.current.srcObject = localStream;
     }
   }, [localStream]);
+
+  useEffect(() => {
+    if (remoteVideoRef.current && remoteStream) {
+      remoteVideoRef.current.srcObject = remoteStream;
+    }
+  }, [remoteStream]);
 
   useEffect(() => {
     if (error) {
@@ -205,23 +213,35 @@ export function Broadcaster() {
             >
               <div className="call-header">
                 <div>
-                  <p className="call-title">You</p>
+                  <p className="call-title">Chromebook Call</p>
                   <p className="call-subtitle">
-                    {status === "connected" ? "On call" : "Ready to call"}
+                    {remoteStream ? "On call" : "Waiting for the other person"}
                   </p>
                 </div>
                 <span className="call-badge">
-                  {status === "connected" ? "Live" : "Preview"}
+                  {remoteStream ? "Live" : "Preview"}
                 </span>
               </div>
               <video
-                ref={videoRef}
+                ref={remoteStream ? remoteVideoRef : localVideoRef}
                 autoPlay
                 playsInline
-                muted
+                muted={!remoteStream}
                 className="w-full aspect-video object-cover rounded-lg video-tile"
-                aria-label="Camera preview"
+                aria-label={remoteStream ? "Remote stream" : "Camera preview"}
               />
+              {remoteStream && localStream && (
+                <div className="pip-shell">
+                  <video
+                    ref={localVideoRef}
+                    autoPlay
+                    playsInline
+                    muted
+                    className="pip-video"
+                    aria-label="Your camera"
+                  />
+                </div>
+              )}
 
               {/* Controls Overlay */}
               <AnimatePresence>

@@ -65,6 +65,7 @@ interface UsePeerBroadcasterReturn {
   peerId: string;
   status: ConnectionState;
   localStream: MediaStream | null;
+  remoteStream: MediaStream | null;
   error: string | null;
   isMuted: boolean;
   facingMode: "user" | "environment";
@@ -78,6 +79,7 @@ export function usePeerBroadcaster(): UsePeerBroadcasterReturn {
   const [peerId] = useState(() => generatePeerId());
   const [status, setStatus] = useState<ConnectionState>("idle");
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
+  const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isMuted, setIsMuted] = useState(false);
   const [facingMode, setFacingMode] = useState<"user" | "environment">("environment");
@@ -154,8 +156,15 @@ export function usePeerBroadcaster(): UsePeerBroadcasterReturn {
             setStatus("streaming");
           } else if (pc.connectionState === "disconnected" || pc.connectionState === "failed") {
             setStatus("waiting");
+            setRemoteStream(null);
             pc.close();
             if (pcRef.current === pc) pcRef.current = null;
+          }
+        };
+
+        pc.ontrack = (event) => {
+          if (event.streams[0]) {
+            setRemoteStream(event.streams[0]);
           }
         };
 
@@ -273,6 +282,7 @@ export function usePeerBroadcaster(): UsePeerBroadcasterReturn {
     disconnectSocket();
     socketRef.current = null;
     setLocalStream(null);
+    setRemoteStream(null);
     setStatus("disconnected");
   }, []);
 
@@ -284,12 +294,25 @@ export function usePeerBroadcaster(): UsePeerBroadcasterReturn {
     };
   }, []);
 
-  return { peerId, status, localStream, error, isMuted, facingMode, startCamera, toggleMute, switchCamera, disconnect };
+  return {
+    peerId,
+    status,
+    localStream,
+    remoteStream,
+    error,
+    isMuted,
+    facingMode,
+    startCamera,
+    toggleMute,
+    switchCamera,
+    disconnect,
+  };
 }
 
 interface UsePeerViewerReturn {
   status: ConnectionState;
   remoteStream: MediaStream | null;
+  localStream: MediaStream | null;
   error: string | null;
   isMuted: boolean;
   connect: (remotePeerId: string) => Promise<void>;
@@ -300,12 +323,14 @@ interface UsePeerViewerReturn {
 export function usePeerViewer(): UsePeerViewerReturn {
   const [status, setStatus] = useState<ConnectionState>("idle");
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
+  const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isMuted, setIsMuted] = useState(false);
 
   const socketRef = useRef<Socket | null>(null);
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const connectingRef = useRef(false);
+  const localStreamRef = useRef<MediaStream | null>(null);
 
   const connect = useCallback(async (remotePeerId: string) => {
     if (!remotePeerId.trim()) {
@@ -321,6 +346,24 @@ export function usePeerViewer(): UsePeerViewerReturn {
 
     setStatus("connecting");
     setError(null);
+
+    if (!localStreamRef.current) {
+      try {
+        const stream = await getCameraStream("user");
+        const videoTrack = stream.getVideoTracks()[0];
+        if (videoTrack) {
+          videoTrack.contentHint = "motion";
+        }
+        localStreamRef.current = stream;
+        setLocalStream(stream);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Failed to access camera";
+        setError(message);
+        setStatus("error");
+        connectingRef.current = false;
+        return;
+      }
+    }
 
     // Clean up previous connection
     pcRef.current?.close();
@@ -367,6 +410,12 @@ export function usePeerViewer(): UsePeerViewerReturn {
         pcRef.current?.close();
         const pc = new RTCPeerConnection(RTC_CONFIG);
         pcRef.current = pc;
+
+        if (localStreamRef.current) {
+          localStreamRef.current.getTracks().forEach((track) => {
+            pc.addTrack(track, localStreamRef.current as MediaStream);
+          });
+        }
 
         // Collect remote stream
         pc.ontrack = (e) => {
@@ -443,14 +492,14 @@ export function usePeerViewer(): UsePeerViewerReturn {
   }, []);
 
   const toggleMute = useCallback(() => {
-    if (remoteStream) {
-      const audioTracks = remoteStream.getAudioTracks();
+    if (localStreamRef.current) {
+      const audioTracks = localStreamRef.current.getAudioTracks();
       audioTracks.forEach((track) => {
         track.enabled = !track.enabled;
       });
       setIsMuted((prev) => !prev);
     }
-  }, [remoteStream]);
+  }, []);
 
   const disconnect = useCallback(() => {
     connectingRef.current = false;
@@ -462,6 +511,9 @@ export function usePeerViewer(): UsePeerViewerReturn {
       socketRef.current = null;
     }
     setRemoteStream(null);
+    localStreamRef.current?.getTracks().forEach((track) => track.stop());
+    localStreamRef.current = null;
+    setLocalStream(null);
     setStatus("disconnected");
   }, []);
 
@@ -472,8 +524,9 @@ export function usePeerViewer(): UsePeerViewerReturn {
         socketRef.current.removeAllListeners();
         socketRef.current.disconnect();
       }
+      localStreamRef.current?.getTracks().forEach((track) => track.stop());
     };
   }, []);
 
-  return { status, remoteStream, error, isMuted, connect, toggleMute, disconnect };
+  return { status, remoteStream, localStream, error, isMuted, connect, toggleMute, disconnect };
 }

@@ -25,6 +25,7 @@ export function Viewer() {
   const {
     status,
     remoteStream,
+    localStream,
     error,
     isMuted,
     connect,
@@ -32,7 +33,8 @@ export function Viewer() {
     disconnect,
   } = usePeerViewer();
 
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const remoteVideoRef = useRef<HTMLVideoElement>(null);
+  const localVideoRef = useRef<HTMLVideoElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const [remotePeerId, setRemotePeerId] = useState("");
   const [showControls, setShowControls] = useState(true);
@@ -44,10 +46,16 @@ export function Viewer() {
   const isConnecting = status === "connecting";
 
   useEffect(() => {
-    if (videoRef.current && remoteStream) {
-      videoRef.current.srcObject = remoteStream;
+    if (remoteVideoRef.current && remoteStream) {
+      remoteVideoRef.current.srcObject = remoteStream;
     }
   }, [remoteStream]);
+
+  useEffect(() => {
+    if (localVideoRef.current && localStream) {
+      localVideoRef.current.srcObject = localStream;
+    }
+  }, [localStream]);
 
   useEffect(() => {
     if (error) {
@@ -238,12 +246,24 @@ export function Viewer() {
                     <span className="call-badge">Live</span>
                   </div>
                   <video
-                    ref={videoRef}
+                    ref={remoteVideoRef}
                     autoPlay
                     playsInline
                     className="w-full aspect-video object-cover rounded-lg video-tile"
                     aria-label="Remote stream"
                   />
+                  {localStream && (
+                    <div className="pip-shell">
+                      <video
+                        ref={localVideoRef}
+                        autoPlay
+                        playsInline
+                        muted
+                        className="pip-video"
+                        aria-label="Your camera"
+                      />
+                    </div>
+                  )}
 
                   {/* Controls Overlay */}
                   <AnimatePresence>
