@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
-import { usePeerBroadcaster } from "@/hooks/usePeerConnection";
+import { usePeerCall } from "@/hooks/usePeerConnection";
 import { ConnectionStatus } from "@/components/ConnectionStatus";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -30,17 +30,17 @@ import {
 
 export function Broadcaster() {
   const {
-    peerId,
+    callId,
     status,
     localStream,
     remoteStream,
     error,
     isMuted,
-    startCamera,
+    startCall,
     toggleMute,
     switchCamera,
     disconnect,
-  } = usePeerBroadcaster();
+  } = usePeerCall();
 
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
@@ -80,9 +80,9 @@ export function Broadcaster() {
 
   const handleCopy = async () => {
     try {
-      await navigator.clipboard.writeText(peerId);
+      await navigator.clipboard.writeText(callId);
       setCopied(true);
-      toast({ title: "Copied!", description: "Peer ID copied to clipboard", variant: "success" });
+      toast({ title: "Copied!", description: "Call ID copied to clipboard", variant: "success" });
       setTimeout(() => setCopied(false), 2000);
     } catch {
       toast({ title: "Copy failed", description: "Please copy the ID manually", variant: "destructive" });
@@ -92,7 +92,7 @@ export function Broadcaster() {
   const handleStartCamera = async () => {
     triggerHaptic([8, 16, 8]);
     setCameraStarted(true);
-    await startCamera();
+    await startCall();
   };
 
   const handleFullscreen = () => {
@@ -153,9 +153,9 @@ export function Broadcaster() {
         <CardContent className="p-4 sm:p-6">
           <div className="flex flex-col sm:flex-row items-center gap-4">
             <div className="flex-1 text-center sm:text-left">
-              <p className="text-xs text-muted-foreground mb-1">Your Peer ID</p>
+              <p className="text-xs text-muted-foreground mb-1">Your Call ID</p>
               <p className="text-xl sm:text-2xl font-bold font-mono tracking-wider text-blue-400 break-all">
-                {peerId}
+                {callId}
               </p>
             </div>
             <div className="flex items-center gap-2">

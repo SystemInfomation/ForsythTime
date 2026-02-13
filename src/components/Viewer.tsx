@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
-import { usePeerViewer } from "@/hooks/usePeerConnection";
+import { usePeerCall } from "@/hooks/usePeerConnection";
 import { ConnectionStatus } from "@/components/ConnectionStatus";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -28,10 +28,10 @@ export function Viewer() {
     localStream,
     error,
     isMuted,
-    connect,
+    joinCall,
     toggleMute,
     disconnect,
-  } = usePeerViewer();
+  } = usePeerCall();
 
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
   const localVideoRef = useRef<HTMLVideoElement>(null);
@@ -84,13 +84,13 @@ export function Viewer() {
       return;
     }
     triggerHaptic([8, 16, 8]);
-    await connect(remotePeerId.trim());
+    await joinCall(remotePeerId.trim());
   };
 
   const handleReconnect = () => {
     triggerHaptic([6, 10, 6]);
     disconnect();
-    setTimeout(() => connect(remotePeerId.trim()), 500);
+    setTimeout(() => joinCall(remotePeerId.trim()), 500);
   };
 
   const handleFullscreen = () => {

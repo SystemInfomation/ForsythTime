@@ -61,34 +61,92 @@ const configureVideoSender = async (sender: RTCRtpSender, track: MediaStreamTrac
   await sender.setParameters(params);
 };
 
-interface UsePeerBroadcasterReturn {
-  peerId: string;
+interface UsePeerCallReturn {
+  callId: string;
   status: ConnectionState;
   localStream: MediaStream | null;
   remoteStream: MediaStream | null;
   error: string | null;
   isMuted: boolean;
   facingMode: "user" | "environment";
-  startCamera: () => Promise<void>;
+  isInitiator: boolean;
+  startCall: () => Promise<void>;
+  joinCall: (roomId: string) => Promise<void>;
   toggleMute: () => void;
   switchCamera: () => void;
   disconnect: () => void;
 }
 
-export function usePeerBroadcaster(): UsePeerBroadcasterReturn {
-  const [peerId] = useState(() => generatePeerId());
+export function usePeerCall(): UsePeerCallReturn {
+  const [callId] = useState(() => generatePeerId());
   const [status, setStatus] = useState<ConnectionState>("idle");
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isMuted, setIsMuted] = useState(false);
-  const [facingMode, setFacingMode] = useState<"user" | "environment">("environment");
+  const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
+  const [isInitiator, setIsInitiator] = useState(false);
 
   const socketRef = useRef<Socket | null>(null);
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const roomIdRef = useRef<string | null>(null);
+  const remotePeerIdRef = useRef<string | null>(null);
 
-  const startCamera = useCallback(async () => {
+  const setupPeerConnection = useCallback((remotePeerId: string) => {
+    if (pcRef.current) {
+      pcRef.current.close();
+    }
+
+    const pc = new RTCPeerConnection(RTC_CONFIG);
+    pcRef.current = pc;
+
+    // Add local tracks
+    if (streamRef.current) {
+      const videoTrack = streamRef.current.getVideoTracks()[0];
+      const audioTrack = streamRef.current.getAudioTracks()[0];
+      if (videoTrack) {
+        const sender = pc.addTrack(videoTrack, streamRef.current);
+        configureVideoSender(sender, videoTrack).catch((err) => {
+          void err;
+        });
+      }
+      if (audioTrack) {
+        pc.addTrack(audioTrack, streamRef.current);
+      }
+    }
+
+    // Handle remote tracks
+    pc.ontrack = (event) => {
+      if (event.streams[0]) {
+        setRemoteStream(event.streams[0]);
+        setStatus("streaming");
+      }
+    };
+
+    // Handle ICE candidates
+    pc.onicecandidate = (e) => {
+      if (e.candidate && socketRef.current) {
+        socketRef.current.emit("ice-candidate", { to: remotePeerId, candidate: e.candidate });
+      }
+    };
+
+    pc.onconnectionstatechange = () => {
+      if (pc.connectionState === "connected") {
+        setStatus("streaming");
+      } else if (pc.connectionState === "disconnected" || pc.connectionState === "failed") {
+        setStatus("disconnected");
+        setRemoteStream(null);
+        pc.close();
+        if (pcRef.current === pc) pcRef.current = null;
+      }
+    };
+
+    return pc;
+  }, []);
+
+  const startCall = useCallback(async () => {
+    setIsInitiator(true);
     try {
       const stream = await getCameraStream(facingMode);
       const videoTrack = stream.getVideoTracks()[0];
@@ -98,6 +156,7 @@ export function usePeerBroadcaster(): UsePeerBroadcasterReturn {
       streamRef.current = stream;
       setLocalStream(stream);
       setError(null);
+      roomIdRef.current = callId;
 
       // Connect to signaling server
       const socket = getSocket();
@@ -112,74 +171,30 @@ export function usePeerBroadcaster(): UsePeerBroadcasterReturn {
 
       socket.on("connect", () => {
         clearTimeout(connectTimeout);
-        socket.emit("create-broadcast", { broadcastId: peerId });
+        socket.emit("join-room", { roomId: callId });
       });
 
-      socket.on("broadcast-created", () => {
+      socket.on("room-participants", () => {
         setStatus("waiting");
       });
 
-      socket.on("viewer-joined", async ({ viewerSocketId }) => {
+      socket.on("user-joined", async ({ socketId }) => {
         setStatus("connected");
-
-        // Tear down previous peer connection if any
-        pcRef.current?.close();
-
-        const pc = new RTCPeerConnection(RTC_CONFIG);
-        pcRef.current = pc;
-
-        // Add local tracks
-        if (streamRef.current) {
-          const activeStream = streamRef.current;
-          const videoTrack = activeStream.getVideoTracks()[0];
-          const audioTrack = activeStream.getAudioTracks()[0];
-          if (videoTrack) {
-            const sender = pc.addTrack(videoTrack, activeStream);
-            configureVideoSender(sender, videoTrack).catch((err) => {
-              void err;
-            });
-          }
-          if (audioTrack) {
-            pc.addTrack(audioTrack, activeStream);
-          }
-        }
-
-        // ICE candidates → relay to viewer
-        pc.onicecandidate = (e) => {
-          if (e.candidate) {
-            socket.emit("ice-candidate", { to: viewerSocketId, candidate: e.candidate });
-          }
-        };
-
-        pc.onconnectionstatechange = () => {
-          if (pc.connectionState === "connected") {
-            setStatus("streaming");
-          } else if (pc.connectionState === "disconnected" || pc.connectionState === "failed") {
-            setStatus("waiting");
-            setRemoteStream(null);
-            pc.close();
-            if (pcRef.current === pc) pcRef.current = null;
-          }
-        };
-
-        pc.ontrack = (event) => {
-          if (event.streams[0]) {
-            setRemoteStream(event.streams[0]);
-          }
-        };
+        remotePeerIdRef.current = socketId;
+        const pc = setupPeerConnection(socketId);
 
         // Create and send offer
         try {
           const offer = await pc.createOffer();
           await pc.setLocalDescription(offer);
-          socket.emit("offer", { to: viewerSocketId, offer: pc.localDescription });
+          socket.emit("offer", { to: socketId, offer: pc.localDescription });
         } catch (err) {
           setStatus("error");
           setError("Failed to create WebRTC offer");
         }
       });
 
-      // Handle answer from viewer
+      // Handle answer
       socket.on("answer", async ({ from, answer }) => {
         if (pcRef.current && pcRef.current.signalingState === "have-local-offer") {
           try {
@@ -190,7 +205,7 @@ export function usePeerBroadcaster(): UsePeerBroadcasterReturn {
         }
       });
 
-      // Handle ICE candidates from viewer
+      // Handle ICE candidates
       socket.on("ice-candidate", async ({ from, candidate }) => {
         if (pcRef.current && candidate) {
           try {
@@ -220,7 +235,102 @@ export function usePeerBroadcaster(): UsePeerBroadcasterReturn {
       setError(message);
       setStatus("error");
     }
-  }, [peerId, facingMode]);
+  }, [callId, facingMode, setupPeerConnection]);
+
+  const joinCall = useCallback(async (roomId: string) => {
+    setIsInitiator(false);
+    if (!roomId.trim()) {
+      setError("Please enter a valid Call ID");
+      return;
+    }
+
+    setStatus("connecting");
+    setError(null);
+    roomIdRef.current = roomId;
+
+    try {
+      const stream = await getCameraStream("user");
+      const videoTrack = stream.getVideoTracks()[0];
+      if (videoTrack) {
+        videoTrack.contentHint = "motion";
+      }
+      streamRef.current = stream;
+      setLocalStream(stream);
+
+      const socket = getSocket();
+      socketRef.current = socket;
+
+      const connectTimeout = setTimeout(() => {
+        if (!socket.connected) {
+          setStatus("error");
+          setError("Signaling server connection timed out.");
+        }
+      }, CONNECT_TIMEOUT);
+
+      socket.on("connect", () => {
+        clearTimeout(connectTimeout);
+        socket.emit("join-room", { roomId });
+      });
+
+      socket.on("room-participants", (participants) => {
+        // Connect to existing participant
+        if (participants.length > 0) {
+          const existingPeer = participants[0];
+          remotePeerIdRef.current = existingPeer.socketId;
+          setupPeerConnection(existingPeer.socketId);
+          setStatus("connected");
+        } else {
+          setStatus("waiting");
+        }
+      });
+
+      // Handle offer from other peer
+      socket.on("offer", async ({ from, offer }) => {
+        remotePeerIdRef.current = from;
+        const pc = setupPeerConnection(from);
+
+        try {
+          await pc.setRemoteDescription(new RTCSessionDescription(offer));
+          const answer = await pc.createAnswer();
+          await pc.setLocalDescription(answer);
+          socket.emit("answer", { to: from, answer: pc.localDescription });
+        } catch (err) {
+          setStatus("error");
+          setError("Failed to establish WebRTC connection");
+        }
+      });
+
+      // Handle ICE candidates
+      socket.on("ice-candidate", async ({ from, candidate }) => {
+        if (pcRef.current && candidate) {
+          try {
+            await pcRef.current.addIceCandidate(new RTCIceCandidate(candidate));
+          } catch (err) {
+            void err;
+          }
+        }
+      });
+
+      socket.on("connect_error", (err) => {
+        clearTimeout(connectTimeout);
+        void err;
+        setStatus("error");
+        setError("Failed to connect to signaling server");
+      });
+
+      socket.on("disconnect", (reason) => {
+        if (reason !== "io client disconnect") {
+          setStatus("disconnected");
+        }
+      });
+
+      socket.connect();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Connection failed";
+      setError(message);
+      setStatus("error");
+    }
+  }, [setupPeerConnection]);
 
   const toggleMute = useCallback(() => {
     if (streamRef.current) {
@@ -282,6 +392,8 @@ export function usePeerBroadcaster(): UsePeerBroadcasterReturn {
     setLocalStream(null);
     setRemoteStream(null);
     setStatus("disconnected");
+    roomIdRef.current = null;
+    remotePeerIdRef.current = null;
   }, []);
 
   useEffect(() => {
@@ -293,240 +405,18 @@ export function usePeerBroadcaster(): UsePeerBroadcasterReturn {
   }, []);
 
   return {
-    peerId,
+    callId,
     status,
     localStream,
     remoteStream,
     error,
     isMuted,
     facingMode,
-    startCamera,
+    isInitiator,
+    startCall,
+    joinCall,
     toggleMute,
     switchCamera,
     disconnect,
   };
-}
-
-interface UsePeerViewerReturn {
-  status: ConnectionState;
-  remoteStream: MediaStream | null;
-  localStream: MediaStream | null;
-  error: string | null;
-  isMuted: boolean;
-  connect: (remotePeerId: string) => Promise<void>;
-  toggleMute: () => void;
-  disconnect: () => void;
-}
-
-export function usePeerViewer(): UsePeerViewerReturn {
-  const [status, setStatus] = useState<ConnectionState>("idle");
-  const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
-  const [localStream, setLocalStream] = useState<MediaStream | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [isMuted, setIsMuted] = useState(false);
-
-  const socketRef = useRef<Socket | null>(null);
-  const pcRef = useRef<RTCPeerConnection | null>(null);
-  const connectingRef = useRef(false);
-  const localStreamRef = useRef<MediaStream | null>(null);
-
-  const connect = useCallback(async (remotePeerId: string) => {
-    if (!remotePeerId.trim()) {
-      setError("Please enter a valid Peer ID");
-      return;
-    }
-
-    // Prevent concurrent connection attempts
-    if (connectingRef.current) {
-      return;
-    }
-    connectingRef.current = true;
-
-    setStatus("connecting");
-    setError(null);
-
-    if (!localStreamRef.current) {
-      try {
-        const stream = await getCameraStream("user");
-        const videoTrack = stream.getVideoTracks()[0];
-        if (videoTrack) {
-          videoTrack.contentHint = "motion";
-        }
-        localStreamRef.current = stream;
-        setLocalStream(stream);
-      } catch (err) {
-        const message = err instanceof Error ? err.message : "Failed to access camera";
-        setError(message);
-        setStatus("error");
-        connectingRef.current = false;
-        return;
-      }
-    }
-
-    // Clean up previous connection
-    pcRef.current?.close();
-    pcRef.current = null;
-    if (socketRef.current) {
-      socketRef.current.removeAllListeners();
-      socketRef.current.disconnect();
-      socketRef.current = null;
-    }
-
-    try {
-      const socket = getSocket();
-      socketRef.current = socket;
-
-      const connectTimeout = setTimeout(() => {
-        if (!socket.connected) {
-          setStatus("error");
-          setError("Signaling server connection timed out.");
-          connectingRef.current = false;
-        }
-      }, CONNECT_TIMEOUT);
-
-      socket.on("connect", () => {
-        clearTimeout(connectTimeout);
-        socket.emit("join-broadcast", { broadcastId: remotePeerId });
-      });
-
-      socket.on("broadcast-not-found", () => {
-        setStatus("error");
-        setError("Broadcast not found. Check the Peer ID and try again.");
-        connectingRef.current = false;
-      });
-
-      socket.on("broadcast-joined", ({ broadcasterSocketId }) => {
-        void broadcasterSocketId;
-        // Peer connection will be created when we receive the offer from the broadcaster
-      });
-
-      // Handle offer from broadcaster
-      socket.on("offer", async ({ from, offer }) => {
-        // Create peer connection
-        pcRef.current?.close();
-        const pc = new RTCPeerConnection(RTC_CONFIG);
-        pcRef.current = pc;
-
-        if (localStreamRef.current) {
-          const videoTrack = localStreamRef.current.getVideoTracks()[0];
-          const audioTrack = localStreamRef.current.getAudioTracks()[0];
-          if (videoTrack) {
-            pc.addTrack(videoTrack, localStreamRef.current);
-          }
-          if (audioTrack) {
-            pc.addTrack(audioTrack, localStreamRef.current);
-          }
-        }
-
-        // Collect remote stream
-        pc.ontrack = (e) => {
-          if (e.streams[0]) {
-            setRemoteStream(e.streams[0]);
-            setStatus("streaming");
-            connectingRef.current = false;
-          }
-        };
-
-        // ICE candidates → relay to broadcaster
-        pc.onicecandidate = (e) => {
-          if (e.candidate) {
-            socket.emit("ice-candidate", { to: from, candidate: e.candidate });
-          }
-        };
-
-        pc.onconnectionstatechange = () => {
-          if (pc.connectionState === "disconnected" || pc.connectionState === "failed") {
-            setStatus("disconnected");
-            setRemoteStream(null);
-            pc.close();
-            if (pcRef.current === pc) pcRef.current = null;
-            connectingRef.current = false;
-          }
-        };
-
-        try {
-          await pc.setRemoteDescription(new RTCSessionDescription(offer));
-          const answer = await pc.createAnswer();
-          await pc.setLocalDescription(answer);
-          socket.emit("answer", { to: from, answer: pc.localDescription });
-        } catch (err) {
-          setStatus("error");
-          setError("Failed to establish WebRTC connection");
-          connectingRef.current = false;
-        }
-      });
-
-      // Handle ICE candidates from broadcaster
-      socket.on("ice-candidate", async ({ from, candidate }) => {
-        if (pcRef.current && candidate) {
-          try {
-            await pcRef.current.addIceCandidate(new RTCIceCandidate(candidate));
-          } catch (err) {
-            void err;
-          }
-        }
-      });
-
-      socket.on("connect_error", (err) => {
-        clearTimeout(connectTimeout);
-        void err;
-        setStatus("error");
-        setError("Failed to connect to signaling server");
-        connectingRef.current = false;
-      });
-
-      socket.on("disconnect", (reason) => {
-        if (reason !== "io client disconnect") {
-          setStatus("disconnected");
-          connectingRef.current = false;
-        }
-      });
-
-      socket.connect();
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Connection failed";
-      setError(message);
-      setStatus("error");
-      connectingRef.current = false;
-    }
-  }, []);
-
-  const toggleMute = useCallback(() => {
-    if (localStreamRef.current) {
-      const audioTracks = localStreamRef.current.getAudioTracks();
-      audioTracks.forEach((track) => {
-        track.enabled = !track.enabled;
-      });
-      setIsMuted((prev) => !prev);
-    }
-  }, []);
-
-  const disconnect = useCallback(() => {
-    connectingRef.current = false;
-    pcRef.current?.close();
-    pcRef.current = null;
-    if (socketRef.current) {
-      socketRef.current.removeAllListeners();
-      socketRef.current.disconnect();
-      socketRef.current = null;
-    }
-    setRemoteStream(null);
-    localStreamRef.current?.getTracks().forEach((track) => track.stop());
-    localStreamRef.current = null;
-    setLocalStream(null);
-    setStatus("disconnected");
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      pcRef.current?.close();
-      if (socketRef.current) {
-        socketRef.current.removeAllListeners();
-        socketRef.current.disconnect();
-      }
-      localStreamRef.current?.getTracks().forEach((track) => track.stop());
-    };
-  }, []);
-
-  return { status, remoteStream, localStream, error, isMuted, connect, toggleMute, disconnect };
 }
