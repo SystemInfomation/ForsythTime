@@ -39,7 +39,6 @@ const getCameraStream = async (facingMode: "user" | "environment") => {
       audio: true,
     });
   } catch (err) {
-    console.warn("[DEBUG] High-quality constraints failed, falling back:", err);
     return await navigator.mediaDevices.getUserMedia({
       video: buildVideoConstraints(facingMode, FALLBACK_VIDEO_CONSTRAINTS),
       audio: true,
@@ -88,7 +87,6 @@ export function usePeerBroadcaster(): UsePeerBroadcasterReturn {
   const streamRef = useRef<MediaStream | null>(null);
 
   const startCamera = useCallback(async () => {
-    console.log("[DEBUG] Starting camera with facing mode:", facingMode);
     try {
       const stream = await getCameraStream(facingMode);
       const videoTrack = stream.getVideoTracks()[0];
@@ -98,7 +96,6 @@ export function usePeerBroadcaster(): UsePeerBroadcasterReturn {
       streamRef.current = stream;
       setLocalStream(stream);
       setError(null);
-      console.log("[DEBUG] Camera stream obtained");
 
       // Connect to signaling server
       const socket = getSocket();
@@ -106,7 +103,6 @@ export function usePeerBroadcaster(): UsePeerBroadcasterReturn {
 
       const connectTimeout = setTimeout(() => {
         if (!socket.connected) {
-          console.error("[DEBUG] Socket connect timed out");
           setStatus("error");
           setError("Signaling server connection timed out. Please try again.");
         }
@@ -114,17 +110,14 @@ export function usePeerBroadcaster(): UsePeerBroadcasterReturn {
 
       socket.on("connect", () => {
         clearTimeout(connectTimeout);
-        console.log("[DEBUG] Socket connected, registering broadcast:", peerId);
         socket.emit("create-broadcast", { broadcastId: peerId });
       });
 
       socket.on("broadcast-created", () => {
-        console.log("[DEBUG] Broadcast registered:", peerId);
         setStatus("waiting");
       });
 
       socket.on("viewer-joined", async ({ viewerSocketId }) => {
-        console.log("[DEBUG] Viewer joined:", viewerSocketId);
         setStatus("connected");
 
         // Tear down previous peer connection if any
@@ -141,7 +134,7 @@ export function usePeerBroadcaster(): UsePeerBroadcasterReturn {
           if (videoTrack) {
             const sender = pc.addTrack(videoTrack, activeStream);
             configureVideoSender(sender, videoTrack).catch((err) => {
-              console.warn("[DEBUG] Failed to apply video sender params:", err);
+              void err;
             });
           }
           if (audioTrack) {
@@ -157,7 +150,6 @@ export function usePeerBroadcaster(): UsePeerBroadcasterReturn {
         };
 
         pc.onconnectionstatechange = () => {
-          console.log("[DEBUG] Broadcaster PC state:", pc.connectionState);
           if (pc.connectionState === "connected") {
             setStatus("streaming");
           } else if (pc.connectionState === "disconnected" || pc.connectionState === "failed") {
@@ -171,10 +163,8 @@ export function usePeerBroadcaster(): UsePeerBroadcasterReturn {
         try {
           const offer = await pc.createOffer();
           await pc.setLocalDescription(offer);
-          console.log("[DEBUG] Sending offer to viewer:", viewerSocketId);
           socket.emit("offer", { to: viewerSocketId, offer: pc.localDescription });
         } catch (err) {
-          console.error("[DEBUG] Failed to create offer:", err);
           setStatus("error");
           setError("Failed to create WebRTC offer");
         }
@@ -182,36 +172,36 @@ export function usePeerBroadcaster(): UsePeerBroadcasterReturn {
 
       // Handle answer from viewer
       socket.on("answer", async ({ from, answer }) => {
-        console.log("[DEBUG] Received answer from:", from);
+        void from;
         if (pcRef.current && pcRef.current.signalingState === "have-local-offer") {
           try {
             await pcRef.current.setRemoteDescription(new RTCSessionDescription(answer));
           } catch (err) {
-            console.error("[DEBUG] Failed to set remote description:", err);
+            void err;
           }
         }
       });
 
       // Handle ICE candidates from viewer
       socket.on("ice-candidate", async ({ from, candidate }) => {
+        void from;
         if (pcRef.current && candidate) {
           try {
             await pcRef.current.addIceCandidate(new RTCIceCandidate(candidate));
           } catch (err) {
-            console.error("[DEBUG] Failed to add ICE candidate:", err);
+            void err;
           }
         }
       });
 
       socket.on("connect_error", (err) => {
         clearTimeout(connectTimeout);
-        console.error("[DEBUG] Socket connect error:", err);
+        void err;
         setStatus("error");
         setError("Failed to connect to signaling server");
       });
 
       socket.on("disconnect", (reason) => {
-        console.log("[DEBUG] Socket disconnected:", reason);
         if (reason !== "io client disconnect") {
           setStatus("disconnected");
         }
@@ -220,7 +210,6 @@ export function usePeerBroadcaster(): UsePeerBroadcasterReturn {
       socket.connect();
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to access camera";
-      console.error("[DEBUG] Camera/start error:", err);
       setError(message);
       setStatus("error");
     }
@@ -262,7 +251,7 @@ export function usePeerBroadcaster(): UsePeerBroadcasterReturn {
           if (sender.track?.kind === "video" && videoTrack) {
             sender.replaceTrack(videoTrack);
             configureVideoSender(sender, videoTrack).catch((err) => {
-              console.warn("[DEBUG] Failed to reapply video sender params:", err);
+              void err;
             });
           }
           if (sender.track?.kind === "audio" && audioTrack) {
@@ -319,7 +308,6 @@ export function usePeerViewer(): UsePeerViewerReturn {
   const connectingRef = useRef(false);
 
   const connect = useCallback(async (remotePeerId: string) => {
-    console.log("[DEBUG] Viewer attempting to connect to:", remotePeerId);
     if (!remotePeerId.trim()) {
       setError("Please enter a valid Peer ID");
       return;
@@ -327,7 +315,6 @@ export function usePeerViewer(): UsePeerViewerReturn {
 
     // Prevent concurrent connection attempts
     if (connectingRef.current) {
-      console.log("[DEBUG] Connection already in progress, ignoring");
       return;
     }
     connectingRef.current = true;
@@ -350,7 +337,6 @@ export function usePeerViewer(): UsePeerViewerReturn {
 
       const connectTimeout = setTimeout(() => {
         if (!socket.connected) {
-          console.error("[DEBUG] Viewer socket connect timed out");
           setStatus("error");
           setError("Signaling server connection timed out.");
           connectingRef.current = false;
@@ -359,25 +345,23 @@ export function usePeerViewer(): UsePeerViewerReturn {
 
       socket.on("connect", () => {
         clearTimeout(connectTimeout);
-        console.log("[DEBUG] Viewer socket connected, joining broadcast:", remotePeerId);
         socket.emit("join-broadcast", { broadcastId: remotePeerId });
       });
 
       socket.on("broadcast-not-found", () => {
-        console.log("[DEBUG] Broadcast not found:", remotePeerId);
         setStatus("error");
         setError("Broadcast not found. Check the Peer ID and try again.");
         connectingRef.current = false;
       });
 
       socket.on("broadcast-joined", ({ broadcasterSocketId }) => {
-        console.log("[DEBUG] Joined broadcast, broadcaster socket:", broadcasterSocketId);
+        void broadcasterSocketId;
         // Peer connection will be created when we receive the offer from the broadcaster
       });
 
       // Handle offer from broadcaster
       socket.on("offer", async ({ from, offer }) => {
-        console.log("[DEBUG] Received offer from broadcaster:", from);
+        void from;
 
         // Create peer connection
         pcRef.current?.close();
@@ -386,7 +370,6 @@ export function usePeerViewer(): UsePeerViewerReturn {
 
         // Collect remote stream
         pc.ontrack = (e) => {
-          console.log("[DEBUG] Received remote track:", e.track.kind);
           if (e.streams[0]) {
             setRemoteStream(e.streams[0]);
             setStatus("streaming");
@@ -402,7 +385,6 @@ export function usePeerViewer(): UsePeerViewerReturn {
         };
 
         pc.onconnectionstatechange = () => {
-          console.log("[DEBUG] Viewer PC state:", pc.connectionState);
           if (pc.connectionState === "disconnected" || pc.connectionState === "failed") {
             setStatus("disconnected");
             setRemoteStream(null);
@@ -416,10 +398,8 @@ export function usePeerViewer(): UsePeerViewerReturn {
           await pc.setRemoteDescription(new RTCSessionDescription(offer));
           const answer = await pc.createAnswer();
           await pc.setLocalDescription(answer);
-          console.log("[DEBUG] Sending answer to broadcaster:", from);
           socket.emit("answer", { to: from, answer: pc.localDescription });
         } catch (err) {
-          console.error("[DEBUG] Failed to handle offer:", err);
           setStatus("error");
           setError("Failed to establish WebRTC connection");
           connectingRef.current = false;
@@ -428,25 +408,25 @@ export function usePeerViewer(): UsePeerViewerReturn {
 
       // Handle ICE candidates from broadcaster
       socket.on("ice-candidate", async ({ from, candidate }) => {
+        void from;
         if (pcRef.current && candidate) {
           try {
             await pcRef.current.addIceCandidate(new RTCIceCandidate(candidate));
           } catch (err) {
-            console.error("[DEBUG] Failed to add ICE candidate:", err);
+            void err;
           }
         }
       });
 
       socket.on("connect_error", (err) => {
         clearTimeout(connectTimeout);
-        console.error("[DEBUG] Viewer socket error:", err);
+        void err;
         setStatus("error");
         setError("Failed to connect to signaling server");
         connectingRef.current = false;
       });
 
       socket.on("disconnect", (reason) => {
-        console.log("[DEBUG] Viewer socket disconnected:", reason);
         if (reason !== "io client disconnect") {
           setStatus("disconnected");
           connectingRef.current = false;
@@ -456,7 +436,6 @@ export function usePeerViewer(): UsePeerViewerReturn {
       socket.connect();
     } catch (err) {
       const message = err instanceof Error ? err.message : "Connection failed";
-      console.error("[DEBUG] Viewer connection error:", err);
       setError(message);
       setStatus("error");
       connectingRef.current = false;

@@ -6,13 +6,8 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export function generatePeerId(): string {
-  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-  const length = 8 + Math.floor(Math.random() * 3); // 8-10 chars
-  let result = "";
-  for (let i = 0; i < length; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return result;
+  const number = Math.floor(Math.random() * 10_000);
+  return `FCS-${number.toString().padStart(4, "0")}`;
 }
 
 export function isMobileDevice(): boolean {
