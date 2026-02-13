@@ -4,7 +4,16 @@ export function GridBackground() {
   return (
     <div className="fixed inset-0 -z-10 overflow-hidden" aria-hidden="true">
       {/* Base gradient */}
-      <div className="absolute inset-0 bg-gradient-to-br from-[#0a0a0a] via-[#0d1117] to-[#0a0a0a]" />
+      <div className="absolute inset-0 bg-gradient-to-br from-[#07080b] via-[#0c111b] to-[#0a0a0f]" />
+
+      {/* Slow-shift gradient wash */}
+      <div
+        className="absolute inset-0 opacity-60"
+        style={{
+          background: "radial-gradient(circle at 10% 20%, rgba(34,211,238,0.08), transparent 45%), radial-gradient(circle at 80% 10%, rgba(168,85,247,0.08), transparent 40%)",
+          animation: "gradient-drift 24s ease-in-out infinite",
+        }}
+      />
 
       {/* Animated grid */}
       <div
@@ -28,10 +37,18 @@ export function GridBackground() {
         style={{ animation: "glow-float 15s ease-in-out infinite" }}
       />
 
+      {/* Subtle noise overlay */}
+      <div className="absolute inset-0 opacity-[0.06] mix-blend-soft-light" style={{ backgroundImage: "repeating-radial-gradient(circle at 0 0, rgba(255,255,255,0.08) 0, rgba(255,255,255,0.08) 1px, transparent 2px, transparent 4px)" }} />
+
       <style jsx>{`
         @keyframes grid-move {
           0% { transform: translate(0, 0); }
           100% { transform: translate(60px, 60px); }
+        }
+        @keyframes gradient-drift {
+          0% { background: radial-gradient(circle at 10% 20%, rgba(34,211,238,0.08), transparent 45%), radial-gradient(circle at 80% 10%, rgba(168,85,247,0.08), transparent 40%); }
+          50% { background: radial-gradient(circle at 20% 70%, rgba(236,72,153,0.1), transparent 45%), radial-gradient(circle at 70% 30%, rgba(34,211,238,0.06), transparent 40%); }
+          100% { background: radial-gradient(circle at 10% 20%, rgba(34,211,238,0.08), transparent 45%), radial-gradient(circle at 80% 10%, rgba(168,85,247,0.08), transparent 40%); }
         }
         @keyframes glow-float {
           0%, 100% { transform: translate(0, 0); opacity: 0.3; }

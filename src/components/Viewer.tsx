@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { usePeerViewer } from "@/hooks/usePeerConnection";
 import { ConnectionStatus } from "@/components/ConnectionStatus";
 import { Card, CardContent } from "@/components/ui/card";
@@ -37,6 +37,9 @@ export function Viewer() {
   const [remotePeerId, setRemotePeerId] = useState("");
   const [showControls, setShowControls] = useState(true);
   const [shakeInput, setShakeInput] = useState(false);
+  const [isIdle, setIsIdle] = useState(false);
+  const idleTimeoutRef = useRef<number | null>(null);
+  const shouldReduceMotion = useReducedMotion();
   // Derive isConnecting from status instead of using separate state
   const isConnecting = status === "connecting";
 
@@ -72,10 +75,12 @@ export function Viewer() {
       toast({ title: "Invalid ID", description: "Please enter a Peer ID", variant: "destructive" });
       return;
     }
+    triggerHaptic([8, 16, 8]);
     await connect(remotePeerId.trim());
   };
 
   const handleReconnect = () => {
+    triggerHaptic([6, 10, 6]);
     disconnect();
     setTimeout(() => connect(remotePeerId.trim()), 500);
   };
@@ -89,6 +94,29 @@ export function Viewer() {
       }
     }
   };
+
+  const triggerHaptic = (pattern: number | number[]) => {
+    if (typeof navigator !== "undefined" && "vibrate" in navigator) {
+      navigator.vibrate(pattern);
+    }
+  };
+
+  const resetIdle = () => {
+    setIsIdle(false);
+    if (idleTimeoutRef.current) {
+      window.clearTimeout(idleTimeoutRef.current);
+    }
+    idleTimeoutRef.current = window.setTimeout(() => setIsIdle(true), 10000);
+  };
+
+  useEffect(() => {
+    resetIdle();
+    return () => {
+      if (idleTimeoutRef.current) {
+        window.clearTimeout(idleTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const handlePaste = (e: React.ClipboardEvent) => {
     e.preventDefault();
@@ -104,7 +132,7 @@ export function Viewer() {
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4 }}
+      transition={{ duration: shouldReduceMotion ? 0 : 0.4 }}
       className="space-y-4"
     >
       {/* Status */}
@@ -114,7 +142,7 @@ export function Viewer() {
 
       {/* Connect Card */}
       {!isStreaming && (
-        <Card className="glass border-white/10">
+        <Card className="glass border-white/10 accent-border">
           <CardContent className="p-4 sm:p-6 space-y-4">
             <div className="space-y-2">
               <Label htmlFor="peer-id-input">Broadcaster Peer ID</Label>
@@ -167,7 +195,7 @@ export function Viewer() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
           >
-            <Card className="glass border-white/10">
+            <Card className="glass border-white/10 accent-border">
               <CardContent className="p-4">
                 <Skeleton className="w-full aspect-video rounded-lg" />
                 <div className="mt-3 flex justify-center">
@@ -188,19 +216,23 @@ export function Viewer() {
             exit={{ opacity: 0, scale: 0.95 }}
             transition={{ duration: 0.4 }}
           >
-            <Card className="glass border-white/10 overflow-hidden">
-              <CardContent className="p-0 relative">
+            <Card className="glass border-white/10 overflow-hidden accent-border">
+              <CardContent className="p-0 relative video-stage">
                 <div
                   className="relative"
                   onMouseEnter={() => setShowControls(true)}
                   onMouseLeave={() => setShowControls(false)}
-                  onTouchStart={() => setShowControls((prev) => !prev)}
+                  onTouchStart={() => {
+                    resetIdle();
+                    setShowControls((prev) => !prev);
+                  }}
+                  onMouseMove={resetIdle}
                 >
                   <video
                     ref={videoRef}
                     autoPlay
                     playsInline
-                    className="w-full aspect-video object-cover rounded-lg"
+                    className="w-full aspect-video object-cover rounded-lg video-tile"
                     aria-label="Remote stream"
                   />
 
@@ -211,13 +243,16 @@ export function Viewer() {
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
-                        className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/60 to-transparent"
+                        className={`absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/60 to-transparent ${isIdle ? "controls-idle" : ""}`}
                       >
                         <div className="flex items-center justify-center gap-2">
                           <Button
                             variant="ghost"
                             size="icon"
-                            onClick={toggleMute}
+                            onClick={() => {
+                              triggerHaptic(8);
+                              toggleMute();
+                            }}
                             className="h-10 w-10 rounded-full bg-white/10 hover:bg-white/20"
                             aria-label={isMuted ? "Unmute" : "Mute"}
                           >
@@ -226,7 +261,10 @@ export function Viewer() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            onClick={handleFullscreen}
+                            onClick={() => {
+                              triggerHaptic(6);
+                              handleFullscreen();
+                            }}
                             className="h-10 w-10 rounded-full bg-white/10 hover:bg-white/20"
                             aria-label="Fullscreen"
                           >
@@ -244,7 +282,10 @@ export function Viewer() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            onClick={disconnect}
+                            onClick={() => {
+                              triggerHaptic([12, 20, 12]);
+                              disconnect();
+                            }}
                             className="h-10 w-10 rounded-full bg-red-500/20 hover:bg-red-500/30 text-red-400"
                             aria-label="Disconnect"
                           >

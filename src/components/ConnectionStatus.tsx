@@ -35,7 +35,7 @@ export function ConnectionStatus({ state }: ConnectionStatusProps) {
       >
         <Badge
           variant={config.variant}
-          className={`gap-1.5 px-3 py-1 text-xs ${config.pulse ? "connected-pulse" : ""}`}
+          className={`gap-1.5 px-3 py-1 text-xs text-glass ${config.pulse ? "connected-pulse" : ""}`}
         >
           {config.icon}
           {config.label}

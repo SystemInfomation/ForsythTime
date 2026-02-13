@@ -7,6 +7,9 @@
   --card-foreground: #ededed;
   --primary: #3b82f6;
   --primary-foreground: #ffffff;
+  --accent-1: #22d3ee;
+  --accent-2: #a855f7;
+  --accent-3: #ec4899;
   --secondary: #1e293b;
   --secondary-foreground: #e2e8f0;
   --muted: #1e293b;
@@ -19,6 +22,10 @@
   --input: #1e293b;
   --ring: #3b82f6;
   --radius: 0.75rem;
+  --glass-blur: 14px;
+  --glass-alpha: 0.62;
+  --glass-border: rgba(255, 255, 255, 0.1);
+  --glow-soft: 0 0 24px rgba(34, 211, 238, 0.2);
 }
 
 @theme inline {
@@ -51,20 +58,74 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  text-rendering: optimizeLegibility;
 }
 
 .glass {
-  background: rgba(17, 17, 17, 0.6);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.05);
+  background: rgba(17, 17, 17, var(--glass-alpha));
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.05), 0 20px 60px rgba(0, 0, 0, 0.35);
 }
 
 .glass-hover:hover {
   background: rgba(30, 30, 30, 0.7);
   border-color: rgba(255, 255, 255, 0.12);
+}
+
+.glass-strong {
+  background: rgba(10, 10, 10, 0.72);
+  backdrop-filter: blur(calc(var(--glass-blur) + 6px));
+  -webkit-backdrop-filter: blur(calc(var(--glass-blur) + 6px));
+}
+
+.accent-border {
+  position: relative;
+  overflow: hidden;
+}
+
+.accent-border::before {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  padding: 1px;
+  background: conic-gradient(from 180deg, rgba(34, 211, 238, 0.4), rgba(168, 85, 247, 0.5), rgba(236, 72, 153, 0.4), rgba(34, 211, 238, 0.4));
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  -webkit-mask-composite: xor;
+  animation: hue-shift 12s linear infinite;
+  pointer-events: none;
+}
+
+.video-stage {
+  perspective: 1200px;
+}
+
+.video-tile {
+  transform-style: preserve-3d;
+  transition: transform 0.4s ease, box-shadow 0.4s ease;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+}
+
+.video-tile:hover {
+  transform: translateZ(18px) scale(1.02);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.55), var(--glow-soft);
+}
+
+.controls-idle {
+  opacity: 0.35;
+}
+
+.controls-idle:hover {
+  opacity: 1;
+}
+
+.text-glass {
+  text-shadow: 0 2px 16px rgba(0, 0, 0, 0.6);
 }
 
 @keyframes glow-pulse {
@@ -88,4 +149,19 @@ body {
 
 .connected-pulse {
   animation: connected-pulse 2s ease-in-out infinite;
+}
+
+@keyframes hue-shift {
+  0% { filter: hue-rotate(0deg); }
+  100% { filter: hue-rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .glow-icon,
+  .connected-pulse,
+  .video-tile,
+  .accent-border::before {
+    animation: none !important;
+    transition: none !important;
+  }
 }

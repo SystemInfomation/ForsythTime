@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { usePeerBroadcaster } from "@/hooks/usePeerConnection";
 import { ConnectionStatus } from "@/components/ConnectionStatus";
 import { Card, CardContent } from "@/components/ui/card";
@@ -46,6 +46,9 @@ export function Broadcaster() {
   const [showControls, setShowControls] = useState(true);
   const [cameraStarted, setCameraStarted] = useState(false);
   const [disconnectOpen, setDisconnectOpen] = useState(false);
+  const [isIdle, setIsIdle] = useState(false);
+  const idleTimeoutRef = useRef<number | null>(null);
+  const shouldReduceMotion = useReducedMotion();
 
   useEffect(() => {
     if (videoRef.current && localStream) {
@@ -79,6 +82,7 @@ export function Broadcaster() {
   };
 
   const handleStartCamera = async () => {
+    triggerHaptic([8, 16, 8]);
     setCameraStarted(true);
     await startCamera();
   };
@@ -94,16 +98,40 @@ export function Broadcaster() {
   };
 
   const handleDisconnect = () => {
+    triggerHaptic([12, 20, 12]);
     disconnect();
     setCameraStarted(false);
     setDisconnectOpen(false);
   };
 
+  const triggerHaptic = (pattern: number | number[]) => {
+    if (typeof navigator !== "undefined" && "vibrate" in navigator) {
+      navigator.vibrate(pattern);
+    }
+  };
+
+  const resetIdle = () => {
+    setIsIdle(false);
+    if (idleTimeoutRef.current) {
+      window.clearTimeout(idleTimeoutRef.current);
+    }
+    idleTimeoutRef.current = window.setTimeout(() => setIsIdle(true), 10000);
+  };
+
+  useEffect(() => {
+    resetIdle();
+    return () => {
+      if (idleTimeoutRef.current) {
+        window.clearTimeout(idleTimeoutRef.current);
+      }
+    };
+  }, []);
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4 }}
+      transition={{ duration: shouldReduceMotion ? 0 : 0.4 }}
       className="space-y-4"
     >
       {/* Status */}
@@ -112,7 +140,7 @@ export function Broadcaster() {
       </div>
 
       {/* Peer ID Card */}
-      <Card className="glass border-white/10">
+      <Card className="glass border-white/10 accent-border">
         <CardContent className="p-4 sm:p-6">
           <div className="flex flex-col sm:flex-row items-center gap-4">
             <div className="flex-1 text-center sm:text-left">
@@ -150,7 +178,7 @@ export function Broadcaster() {
 
       {/* Camera Preview */}
       {!cameraStarted ? (
-        <Card className="glass border-white/10">
+        <Card className="glass border-white/10 accent-border">
           <CardContent className="p-6 sm:p-8 flex flex-col items-center justify-center min-h-[200px]">
             <Camera className="h-12 w-12 text-muted-foreground mb-4" />
             <p className="text-sm text-muted-foreground mb-4 text-center">
@@ -163,20 +191,24 @@ export function Broadcaster() {
           </CardContent>
         </Card>
       ) : (
-        <Card className="glass border-white/10 overflow-hidden">
-          <CardContent className="p-0 relative">
+        <Card className="glass border-white/10 overflow-hidden accent-border">
+          <CardContent className="p-0 relative video-stage">
             <div
               className="relative"
               onMouseEnter={() => setShowControls(true)}
               onMouseLeave={() => setShowControls(false)}
-              onTouchStart={() => setShowControls((prev) => !prev)}
+              onTouchStart={(event) => {
+                resetIdle();
+                setShowControls((prev) => !prev);
+              }}
+              onMouseMove={resetIdle}
             >
               <video
                 ref={videoRef}
                 autoPlay
                 playsInline
                 muted
-                className="w-full aspect-video object-cover rounded-lg"
+                className="w-full aspect-video object-cover rounded-lg video-tile"
                 aria-label="Camera preview"
               />
 
@@ -187,13 +219,16 @@ export function Broadcaster() {
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
-                    className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/60 to-transparent"
+                    className={`absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/60 to-transparent ${isIdle ? "controls-idle" : ""}`}
                   >
                     <div className="flex items-center justify-center gap-2">
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={toggleMute}
+                        onClick={() => {
+                          triggerHaptic(8);
+                          toggleMute();
+                        }}
                         className="h-10 w-10 rounded-full bg-white/10 hover:bg-white/20"
                         aria-label={isMuted ? "Unmute" : "Mute"}
                       >
@@ -211,7 +246,10 @@ export function Broadcaster() {
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={handleFullscreen}
+                        onClick={() => {
+                          triggerHaptic(6);
+                          handleFullscreen();
+                        }}
                         className="h-10 w-10 rounded-full bg-white/10 hover:bg-white/20"
                         aria-label="Fullscreen"
                       >

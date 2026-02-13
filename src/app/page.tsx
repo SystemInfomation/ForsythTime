@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { GridBackground } from "@/components/GridBackground";
 import { Broadcaster } from "@/components/Broadcaster";
@@ -21,6 +21,13 @@ export default function Home() {
   const mountRef = (node: HTMLElement | null) => {
     if (node && !isClientMounted) setIsClientMounted(true);
   };
+
+  useEffect(() => {
+    const hour = new Date().getHours();
+    const lowLight = hour >= 20 || hour < 6;
+    document.documentElement.style.setProperty("--glass-blur", lowLight ? "18px" : "14px");
+    document.documentElement.style.setProperty("--glass-alpha", lowLight ? "0.68" : "0.62");
+  }, []);
 
   if (!isClientMounted) {
     // Render a hidden div just to trigger mountRef
@@ -50,7 +57,7 @@ export default function Home() {
                 Forsyth Time
               </h1>
             </div>
-            <p className="text-sm sm:text-base text-muted-foreground">
+            <p className="text-sm sm:text-base text-muted-foreground text-glass">
               Real-time chromebook to chromebook streaming
             </p>
           </motion.div>
