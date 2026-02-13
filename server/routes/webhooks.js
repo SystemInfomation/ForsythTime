@@ -29,7 +29,7 @@ router.post(
     let evt;
     try {
       const wh = new Webhook(CLERK_WEBHOOK_SECRET);
-      const body = typeof req.body === "string" ? req.body : req.body.toString();
+      const body = Buffer.isBuffer(req.body) ? req.body.toString() : req.body;
       evt = wh.verify(body, {
         "svix-id": svixId,
         "svix-timestamp": svixTimestamp,

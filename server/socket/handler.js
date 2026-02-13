@@ -49,8 +49,6 @@ function getParticipantList(roomId) {
   }));
 }
 
-let guestCounter = 0;
-
 function setupSocket(io) {
   // JWT auth middleware — supports guest mode
   io.use((socket, next) => {
@@ -70,10 +68,9 @@ function setupSocket(io) {
       socket.data.authenticated = false;
     }
 
-    // Guest username
+    // Guest username with unique suffix
     if (!socket.data.authenticated) {
-      guestCounter++;
-      socket.data.username = `Guest_${guestCounter}`;
+      socket.data.username = `Guest_${generateShortId(6)}`;
       socket.data.isGuest = true;
     }
 
@@ -294,12 +291,12 @@ function setupSocket(io) {
 
       try {
         const room = await Room.findOne({ roomId });
-        if (!room || !room.creator.equals(socket.data.userId)) {
+        if (!room || String(room.creator) !== String(socket.data.userId)) {
           socket.emit("error-message", { message: "Only room creator can approve users" });
           return;
         }
 
-        room.waitingRoom = room.waitingRoom.filter((id) => !id.equals(userId));
+        room.waitingRoom = room.waitingRoom.filter((id) => String(id) !== String(userId));
         await room.save();
 
         // Notify the approved user (they might be connected)
@@ -324,12 +321,12 @@ function setupSocket(io) {
 
       try {
         const room = await Room.findOne({ roomId });
-        if (!room || !room.creator.equals(socket.data.userId)) {
+        if (!room || String(room.creator) !== String(socket.data.userId)) {
           socket.emit("error-message", { message: "Only room creator can reject users" });
           return;
         }
 
-        room.waitingRoom = room.waitingRoom.filter((id) => !id.equals(userId));
+        room.waitingRoom = room.waitingRoom.filter((id) => String(id) !== String(userId));
         await room.save();
 
         // Notify the rejected user
