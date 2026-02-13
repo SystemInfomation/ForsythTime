@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import type { ConnectionState } from "@/components/ConnectionStatus";
 import { generatePeerId } from "@/lib/utils";
+import { PEER_CONFIG } from "@/lib/peer";
 
 // PeerJS is loaded dynamically because it accesses browser APIs
 // HTTPS note: WebRTC requires secure contexts. Vercel deploys are HTTPS by default.
@@ -45,7 +46,7 @@ export function usePeerBroadcaster(): UsePeerBroadcasterReturn {
 
       // Import PeerJS dynamically
       const { default: Peer } = await import("peerjs");
-      const peer = new Peer(peerId);
+      const peer = new Peer(peerId, PEER_CONFIG);
       peerRef.current = peer;
 
       peer.on("open", () => {
@@ -192,7 +193,7 @@ export function usePeerViewer(): UsePeerViewerReturn {
       // Cleanup previous connection
       peerRef.current?.destroy();
 
-      const peer = new Peer();
+      const peer = new Peer(undefined, PEER_CONFIG);
       peerRef.current = peer;
 
       peer.on("open", () => {

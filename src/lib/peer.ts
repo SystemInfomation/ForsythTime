@@ -4,9 +4,12 @@
 // - For local development, use localhost or ngrok/cloudflare tunnel
 
 export const PEER_CONFIG = {
-  // Use the default PeerJS cloud server for signaling
-  // In production, you may want to run your own PeerServer
-  debug: process.env.NODE_ENV === "development" ? 2 : 0,
+  // Use custom signaling server
+  host: 'forsythtime.onrender.com',
+  port: 443,
+  path: '/',
+  secure: true,
+  debug: (typeof window !== 'undefined' && window.location.hostname === 'localhost') ? 2 : 0,
 } as const;
 
 export function validatePeerId(id: string): boolean {
