@@ -498,4 +498,102 @@ describe("PeerJS end-to-end connection flow (strict)", () => {
       broadcaster.destroy();
     });
   });
+
+  describe("Auto-answer incoming calls", () => {
+    it("viewer auto-answers an incoming call from the broadcaster", async () => {
+      const Peer = (await import("peerjs")).default;
+
+      const viewer = new Peer("auto-answer-viewer") as unknown as FakePeer;
+      jest.runAllTimers();
+
+      const fakeStream = { id: "broadcaster-stream" } as unknown as MediaStream;
+      const incomingCall = new FakeMediaConnection();
+
+      let receivedStream: MediaStream | null = null;
+      // Simulate the viewer listening for calls and auto-answering
+      viewer.on("call", (call: FakeMediaConnection) => {
+        call.answer(new MediaStream());
+        call.on("stream", (stream: MediaStream) => {
+          receivedStream = stream;
+        });
+      });
+
+      // Broadcaster initiates a call to the viewer
+      viewer.emit("call", incomingCall);
+
+      // Simulate the broadcaster sending its stream after answer
+      incomingCall.emit("stream", fakeStream);
+
+      expect(incomingCall.answeredWith).not.toBeNull();
+      expect(receivedStream).toBe(fakeStream);
+    });
+
+    it("viewer receives broadcaster stream via auto-answer even without initiating a call", async () => {
+      const Peer = (await import("peerjs")).default;
+
+      const events: string[] = [];
+      const viewer = new Peer("passive-viewer") as unknown as FakePeer;
+      viewer.on("open", () => events.push("viewer:open"));
+      jest.runAllTimers();
+
+      expect(events).toStrictEqual(["viewer:open"]);
+
+      const fakeStream = { id: "auto-stream" } as unknown as MediaStream;
+      const incomingCall = new FakeMediaConnection();
+
+      let receivedStream: MediaStream | null = null;
+      viewer.on("call", (call: FakeMediaConnection) => {
+        events.push("viewer:auto-answer");
+        const silentStream = new MediaStream();
+        call.answer(silentStream);
+        call.on("stream", (stream: MediaStream) => {
+          events.push("viewer:stream-received");
+          receivedStream = stream;
+        });
+      });
+
+      viewer.emit("call", incomingCall);
+      // Simulate stream delivery after answer
+      incomingCall.emit("stream", fakeStream);
+
+      expect(events).toStrictEqual([
+        "viewer:open",
+        "viewer:auto-answer",
+        "viewer:stream-received",
+      ]);
+      expect(receivedStream).toBe(fakeStream);
+      expect(incomingCall.answeredWith).toBeInstanceOf(MediaStream);
+    });
+  });
+
+  describe("Connection timeout", () => {
+    it("peer that never opens does not fire open event after destroy", async () => {
+      const Peer = (await import("peerjs")).default;
+
+      const peer = new Peer("timeout-test") as unknown as FakePeer;
+      let opened = false;
+      peer.on("open", () => {
+        opened = true;
+      });
+
+      // Destroy before open fires (simulating a timeout handler)
+      peer.destroy();
+      jest.runAllTimers();
+
+      expect(opened).toBe(false);
+      expect(peer.destroyed).toBe(true);
+    });
+
+    it("destroyed peer cannot initiate calls after timeout", async () => {
+      const Peer = (await import("peerjs")).default;
+
+      const peer = new Peer("timeout-call") as unknown as FakePeer;
+      jest.runAllTimers();
+      peer.destroy();
+
+      expect(() => {
+        peer.call("some-broadcaster", new MediaStream());
+      }).toThrow("Cannot call on a destroyed peer");
+    });
+  });
 });
