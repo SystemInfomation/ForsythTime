@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
-import HCaptcha from "@hcaptcha/react-hcaptcha";
 import { usePeerCall } from "@/hooks/usePeerConnection";
 import { ConnectionStatus } from "@/components/ConnectionStatus";
 import { Card, CardContent } from "@/components/ui/card";
@@ -45,18 +44,13 @@ export function Broadcaster() {
 
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
-  const hCaptchaRef = useRef<HCaptcha>(null);
   const [copied, setCopied] = useState(false);
   const [showControls, setShowControls] = useState(true);
   const [cameraStarted, setCameraStarted] = useState(false);
   const [disconnectOpen, setDisconnectOpen] = useState(false);
-  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const [isIdle, setIsIdle] = useState(false);
   const idleTimeoutRef = useRef<number | null>(null);
   const shouldReduceMotion = useReducedMotion();
-
-  // Hardcoded hCaptcha production site key
-  const hCaptchaSiteKey = "e88ae612-2144-47f6-beb2-25927afc0d0c";
 
   useEffect(() => {
     const localVideo = localVideoRef.current;
@@ -116,33 +110,8 @@ export function Broadcaster() {
     }
   };
 
-  const handleCaptchaVerify = (token: string) => {
-    console.debug("[Broadcaster] hCaptcha verified successfully");
-    setCaptchaToken(token);
-    toast({ title: "Verification Complete", description: "You can now start the call", variant: "success" });
-  };
-
-  const handleCaptchaExpire = () => {
-    console.debug("[Broadcaster] hCaptcha expired");
-    setCaptchaToken(null);
-    toast({ title: "Verification Expired", description: "Please verify again", variant: "destructive" });
-  };
-
-  const handleCaptchaError = (err: string) => {
-    console.error("[Broadcaster] hCaptcha error:", err);
-    toast({ title: "Verification Error", description: "Please try again", variant: "destructive" });
-  };
-
   const handleStartCamera = async () => {
-    if (!captchaToken) {
-      toast({ title: "Verification Required", description: "Please complete the hCaptcha verification", variant: "destructive" });
-      return;
-    }
-
-    // Note: Using client-side verification only for static export compatibility
-    // The captcha token is verified by hCaptcha client library before being set
-    console.debug("[Broadcaster] Captcha verified by client, starting call with callId:", callId);
-
+    console.debug("[Broadcaster] Starting call with callId:", callId);
     triggerHaptic([8, 16, 8]);
     setCameraStarted(true);
     await startCall();
@@ -246,30 +215,14 @@ export function Broadcaster() {
             <p className="text-sm text-muted-foreground text-center">
               Start a call to share your camera
             </p>
-            <div className="flex justify-center">
-              <HCaptcha
-                ref={hCaptchaRef}
-                sitekey={hCaptchaSiteKey}
-                onVerify={handleCaptchaVerify}
-                onExpire={handleCaptchaExpire}
-                onError={handleCaptchaError}
-                theme="dark"
-              />
-            </div>
             <Button 
               onClick={handleStartCamera} 
               className="gap-2" 
               size="lg"
-              disabled={!captchaToken}
             >
               <Video className="h-4 w-4" />
               Start Call
             </Button>
-            {!captchaToken && (
-              <p className="text-xs text-muted-foreground text-center">
-                Complete the verification above to start the call
-              </p>
-            )}
           </CardContent>
         </Card>
       ) : (
