@@ -55,8 +55,8 @@ export function Broadcaster() {
   const idleTimeoutRef = useRef<number | null>(null);
   const shouldReduceMotion = useReducedMotion();
 
-  // Hardcoded hCaptcha test site key (always passes - for testing/demo purposes)
-  const hCaptchaSiteKey = "10000000-ffff-ffff-ffff-000000000001";
+  // Hardcoded hCaptcha production site key
+  const hCaptchaSiteKey = "e88ae612-2144-47f6-beb2-25927afc0d0c";
 
   useEffect(() => {
     const localVideo = localVideoRef.current;
