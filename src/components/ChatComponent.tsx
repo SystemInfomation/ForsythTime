@@ -51,7 +51,10 @@ export function ChatComponent() {
 
     const initChat = async () => {
       try {
-        const realtimeClient = new Realtime({ key: apiKey });
+        const realtimeClient = new Realtime({ 
+          key: apiKey,
+          clientId: user.username, // Required for sending messages
+        });
         const chatClient = new ChatClient(realtimeClient);
         chatClientRef.current = chatClient;
 
