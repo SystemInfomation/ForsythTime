@@ -55,7 +55,8 @@ export function Broadcaster() {
   const idleTimeoutRef = useRef<number | null>(null);
   const shouldReduceMotion = useReducedMotion();
 
-  const hCaptchaSiteKey = process.env.NEXT_PUBLIC_HCAPTCHA_SITE_KEY || "";
+  // Hardcoded hCaptcha test site key (always passes - for testing/demo purposes)
+  const hCaptchaSiteKey = "10000000-ffff-ffff-ffff-000000000001";
 
   useEffect(() => {
     const localVideo = localVideoRef.current;
@@ -133,7 +134,7 @@ export function Broadcaster() {
   };
 
   const handleStartCamera = async () => {
-    if (hCaptchaSiteKey && !captchaToken) {
+    if (!captchaToken) {
       toast({ title: "Verification Required", description: "Please complete the hCaptcha verification", variant: "destructive" });
       return;
     }
@@ -241,27 +242,25 @@ export function Broadcaster() {
             <p className="text-sm text-muted-foreground text-center">
               Start a call to share your camera
             </p>
-            {hCaptchaSiteKey && (
-              <div className="flex justify-center">
-                <HCaptcha
-                  ref={hCaptchaRef}
-                  sitekey={hCaptchaSiteKey}
-                  onVerify={handleCaptchaVerify}
-                  onExpire={handleCaptchaExpire}
-                  onError={handleCaptchaError}
-                />
-              </div>
-            )}
+            <div className="flex justify-center">
+              <HCaptcha
+                ref={hCaptchaRef}
+                sitekey={hCaptchaSiteKey}
+                onVerify={handleCaptchaVerify}
+                onExpire={handleCaptchaExpire}
+                onError={handleCaptchaError}
+              />
+            </div>
             <Button 
               onClick={handleStartCamera} 
               className="gap-2" 
               size="lg"
-              disabled={Boolean(hCaptchaSiteKey) && !captchaToken}
+              disabled={!captchaToken}
             >
               <Video className="h-4 w-4" />
               Start Call
             </Button>
-            {hCaptchaSiteKey && !captchaToken && (
+            {!captchaToken && (
               <p className="text-xs text-muted-foreground text-center">
                 Complete the verification above to start the call
               </p>
