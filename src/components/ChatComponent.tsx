@@ -1,17 +1,18 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useUser } from "@clerk/nextjs";
+import { useAuth } from "@/lib/auth";
 import { Realtime } from "ably";
 import { ChatClient } from "@ably/chat";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Send, MessageSquare } from "lucide-react";
+import { Send, MessageSquare, LogOut } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { moderateMessage } from "@/lib/moderate";
 import { translateMessage } from "@/lib/translate";
 import { logChatMessage } from "@/lib/supabase";
+import { LoginForm } from "@/components/LoginForm";
 
 interface ChatMessage {
   id: string;
@@ -22,7 +23,7 @@ interface ChatMessage {
 }
 
 export function ChatComponent() {
-  const { user, isLoaded } = useUser();
+  const { user, isLoaded, logout } = useAuth();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [translatedMessages, setTranslatedMessages] = useState<Map<string, string>>(new Map());
   const [inputValue, setInputValue] = useState("");
@@ -64,7 +65,7 @@ export function ChatComponent() {
         await room.messages.subscribe((event) => {
           const message = event.message;
           const displayName = message.clientId || "Anonymous";
-          const isCurrentUser = message.clientId === (user.firstName || user.username);
+          const isCurrentUser = message.clientId === user.username;
           
           const timestamp = message.timestamp instanceof Date 
             ? message.timestamp.getTime() 
@@ -177,14 +178,7 @@ export function ChatComponent() {
   }
 
   if (!user) {
-    return (
-      <Card className="glass border-white/10">
-        <CardContent className="p-6 text-center">
-          <MessageSquare className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
-          <p className="text-sm text-muted-foreground">Please sign in to use chat</p>
-        </CardContent>
-      </Card>
-    );
+    return <LoginForm />;
   }
 
   return (
@@ -192,13 +186,27 @@ export function ChatComponent() {
       {/* Main Chat Panel */}
       <Card className="glass border-white/10">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <MessageSquare className="h-5 w-5" />
-            Live Chat
-            {isConnected && (
-              <span className="ml-auto text-xs text-green-400 font-normal">● Connected</span>
-            )}
-          </CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <MessageSquare className="h-5 w-5" />
+              Live Chat
+              {isConnected && (
+                <span className="ml-2 text-xs text-green-400 font-normal">● Connected</span>
+              )}
+            </CardTitle>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">@{user.username}</span>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={logout}
+                className="text-xs"
+              >
+                <LogOut className="h-4 w-4 mr-1" />
+                Logout
+              </Button>
+            </div>
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Messages Container */}
