@@ -23,70 +23,36 @@ jest.mock('@/hooks/use-toast', () => ({
   toast: jest.fn(),
 }));
 
-// Mock hCaptcha component
-jest.mock('@hcaptcha/react-hcaptcha', () => {
-  const React = require('react');
-  // eslint-disable-next-line react/display-name
-  return React.forwardRef((props: { onVerify?: (token: string) => void }, _ref: unknown) => {
-    const handleClick = () => {
-      if (props.onVerify) {
-        props.onVerify('test-captcha-token-12345');
-      }
-    };
-    return (
-      <div data-testid="hcaptcha-mock" onClick={handleClick}>
-        hCaptcha Mock
-      </div>
-    );
-  });
-});
-
-describe('Broadcaster Component with hCaptcha', () => {
+describe('Broadcaster Component', () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });
 
-  it('should render the broadcaster with hCaptcha', () => {
+  it('should render the broadcaster component', () => {
     render(<Broadcaster />);
     
     expect(screen.getByText('Your Call ID')).toBeInTheDocument();
     expect(screen.getByText('test-call-id-123')).toBeInTheDocument();
-    expect(screen.getByTestId('hcaptcha-mock')).toBeInTheDocument();
   });
 
-  it('should disable Start Call button before hCaptcha verification', () => {
+  it('should show Start Call button', () => {
     render(<Broadcaster />);
     
     const startButton = screen.getByRole('button', { name: /start call/i });
-    expect(startButton).toBeDisabled();
-    expect(screen.getByText(/complete the verification above/i)).toBeInTheDocument();
+    expect(startButton).toBeInTheDocument();
+    expect(startButton).not.toBeDisabled();
   });
 
-  it('should enable Start Call button after hCaptcha verification', async () => {
-    const user = userEvent.setup();
+  it('should display call instructions', () => {
     render(<Broadcaster />);
     
-    const startButton = screen.getByRole('button', { name: /start call/i });
-    expect(startButton).toBeDisabled();
-    
-    // Simulate hCaptcha verification
-    const captcha = screen.getByTestId('hcaptcha-mock');
-    await user.click(captcha);
-    
-    await waitFor(() => {
-      expect(startButton).not.toBeDisabled();
-    });
+    expect(screen.getByText(/start a call to share your camera/i)).toBeInTheDocument();
   });
 
-  it('should show verification message before captcha completion', () => {
+  it('should render copy button for call ID', () => {
     render(<Broadcaster />);
     
-    expect(screen.getByText(/complete the verification above to start the call/i)).toBeInTheDocument();
-  });
-
-  it('should always render hCaptcha with hardcoded site key', () => {
-    render(<Broadcaster />);
-    
-    expect(screen.getByTestId('hcaptcha-mock')).toBeInTheDocument();
+    const copyButton = screen.getByRole('button', { name: /copy/i });
+    expect(copyButton).toBeInTheDocument();
   });
 });
