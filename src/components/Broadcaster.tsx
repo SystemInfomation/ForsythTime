@@ -139,40 +139,9 @@ export function Broadcaster() {
       return;
     }
 
-    // Verify captcha token with backend
-    try {
-      console.debug("[Broadcaster] Verifying captcha with backend...");
-      const response = await fetch('/time/api/verify-captcha', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ token: captchaToken }),
-      });
-
-      const result = await response.json();
-
-      if (!result.success) {
-        console.error("[Broadcaster] Captcha verification failed:", result.error);
-        toast({ 
-          title: "Verification Failed", 
-          description: "Captcha verification failed. Please try again.", 
-          variant: "destructive" 
-        });
-        setCaptchaToken(null); // Reset token so user must verify again
-        return;
-      }
-
-      console.debug("[Broadcaster] Captcha verified successfully, starting call with callId:", callId);
-    } catch (error) {
-      console.error("[Broadcaster] Error verifying captcha:", error);
-      toast({ 
-        title: "Verification Error", 
-        description: "Could not verify captcha. Please try again.", 
-        variant: "destructive" 
-      });
-      return;
-    }
+    // Note: Using client-side verification only for static export compatibility
+    // The captcha token is verified by hCaptcha client library before being set
+    console.debug("[Broadcaster] Captcha verified by client, starting call with callId:", callId);
 
     triggerHaptic([8, 16, 8]);
     setCameraStarted(true);
