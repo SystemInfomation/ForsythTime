@@ -98,4 +98,13 @@ describe('Broadcaster Component with hCaptcha', () => {
     
     expect(screen.queryByTestId('hcaptcha-mock')).not.toBeInTheDocument();
   });
+
+  it('should enable Start Call button when site key is missing (no captcha required)', () => {
+    delete process.env.NEXT_PUBLIC_HCAPTCHA_SITE_KEY;
+    render(<Broadcaster />);
+    
+    const startButton = screen.getByRole('button', { name: /start call/i });
+    expect(startButton).not.toBeDisabled();
+    expect(screen.queryByText(/complete the verification above/i)).not.toBeInTheDocument();
+  });
 });

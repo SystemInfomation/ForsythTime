@@ -133,7 +133,7 @@ export function Broadcaster() {
   };
 
   const handleStartCamera = async () => {
-    if (!captchaToken) {
+    if (hCaptchaSiteKey && !captchaToken) {
       toast({ title: "Verification Required", description: "Please complete the hCaptcha verification", variant: "destructive" });
       return;
     }
@@ -256,12 +256,12 @@ export function Broadcaster() {
               onClick={handleStartCamera} 
               className="gap-2" 
               size="lg"
-              disabled={!captchaToken}
+              disabled={!!hCaptchaSiteKey && !captchaToken}
             >
               <Video className="h-4 w-4" />
               Start Call
             </Button>
-            {!captchaToken && (
+            {hCaptchaSiteKey && !captchaToken && (
               <p className="text-xs text-muted-foreground text-center">
                 Complete the verification above to start the call
               </p>
